@@ -627,7 +627,7 @@ static int ashmem_pin_unpin(struct ashmem_area *asma, unsigned long cmd,
 }
 
 #ifdef CONFIG_OUTER_CACHE
-static unsigned int virtaddr_to_physaddr(unsigned int virtaddr)
+static unsigned int kgsl_virtaddr_to_physaddr(unsigned int virtaddr)
 {
 	unsigned int physaddr = 0;
 	pgd_t *pgd_ptr = NULL;
@@ -659,8 +659,9 @@ static unsigned int virtaddr_to_physaddr(unsigned int virtaddr)
 
 	pte_ptr = pte_offset_map(pmd_ptr, virtaddr);
 	if (!pte_ptr) {
-		pr_err("Failed to convert pmd_ptr %p to pte_ptr\n",
-			(void *)pmd_ptr);
+		pr_info
+		    ("Unable to map pte entry while trying to convert virtual "
+		     "address to physical\n");
 		goto done;
 	}
 	pte = *pte_ptr;
@@ -705,7 +706,7 @@ static int ashmem_cache_op(struct ashmem_area *asma,
 	for (vaddr = asma->vm_start; vaddr < asma->vm_start + asma->size;
 		vaddr += PAGE_SIZE) {
 		unsigned long physaddr;
-		physaddr = virtaddr_to_physaddr(vaddr);
+		physaddr = kgsl_virtaddr_to_physaddr(vaddr);
 		if (!physaddr)
 			return -EINVAL;
 		cache_func(vaddr, PAGE_SIZE, physaddr);
@@ -763,9 +764,6 @@ static long ashmem_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		break;
 	case ASHMEM_CACHE_CLEAN_RANGE:
 		ret = ashmem_cache_op(asma, &clean_caches);
-		break;
-	case ASHMEM_CACHE_INV_RANGE:
-		ret = ashmem_cache_op(asma, &invalidate_caches);
 		break;
 	}
 
