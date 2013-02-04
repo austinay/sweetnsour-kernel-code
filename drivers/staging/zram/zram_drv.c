@@ -32,48 +32,82 @@
 
 #if defined(CONFIG_ZRAM_LZO)
 #include <linux/lzo.h>
-#define WMSIZE		LZO1X_MEM_COMPRESS
-#define COMPRESS(s, sl, d, dl, wm)	\
-	lzo1x_1_compress(s, sl, d, dl, wm)
-#define DECOMPRESS(s, sl, d, dl)	\
-	lzo1x_decompress_safe(s, sl, d, dl)
-#elif defined(CONFIG_ZRAM_SNAPPY)
+#ifdef MULTIPLE_COMPRESSORS
+static const struct zram_compressor lzo_compressor = {
+.name = "LZO",
+.workmem_bytes = LZO1X_MEM_COMPRESS,
+.compress = &lzo1x_1_compress,
+.decompress = &lzo1x_decompress_safe
+};
+#else /* !MULTIPLE_COMPRESSORS */
+#define WMSIZE LZO1X_MEM_COMPRESS
+#define COMPRESS(s, sl, d, dl, wm) \
+lzo1x_1_compress(s, sl, d, dl, wm)
+#define DECOMPRESS(s, sl, d, dl) \
+lzo1x_decompress_safe(s, sl, d, dl)
+#endif /* !MULTIPLE_COMPRESSORS */
+#endif /* defined(CONFIG_ZRAM_LZO) */
+
+#if defined(CONFIG_ZRAM_SNAPPY)
 #include "../snappy/csnappy.h" /* if built in drivers/staging */
-#define WMSIZE_ORDER	((PAGE_SHIFT > 14) ? (15) : (PAGE_SHIFT+1))
-#define WMSIZE		(1 << WMSIZE_ORDER)
+#define WMSIZE_ORDER ((PAGE_SHIFT > 14) ? (15) : (PAGE_SHIFT+1))
 static int
 snappy_compress_(
-	const unsigned char *src,
-	size_t src_len,
-	unsigned char *dst,
-	size_t *dst_len,
-	void *workmem)
+const unsigned char *src,
+size_t src_len,
+unsigned char *dst,
+size_t *dst_len,
+void *workmem)
 {
-	const unsigned char *end = csnappy_compress_fragment(
-		src, (uint32_t)src_len, dst, workmem, WMSIZE_ORDER);
-	*dst_len = end - dst;
-	return 0;
+const unsigned char *end = csnappy_compress_fragment(
+src, (uint32_t)src_len, dst, workmem, WMSIZE_ORDER);
+*dst_len = end - dst;
+return 0;
 }
 static int
 snappy_decompress_(
-	const unsigned char *src,
-	size_t src_len,
-	unsigned char *dst,
-	size_t *dst_len)
+const unsigned char *src,
+size_t src_len,
+unsigned char *dst,
+size_t *dst_len)
 {
-	uint32_t dst_len_ = (uint32_t)*dst_len;
-	int ret = csnappy_decompress_noheader(src, src_len, dst, &dst_len_);
-	*dst_len = (size_t)dst_len_;
-	return ret;
+uint32_t dst_len_ = (uint32_t)*dst_len;
+int ret = csnappy_decompress_noheader(src, src_len, dst, &dst_len_);
+*dst_len = (size_t)dst_len_;
+return ret;
 }
-#define COMPRESS(s, sl, d, dl, wm)	\
-	snappy_compress_(s, sl, d, dl, wm)
-#define DECOMPRESS(s, sl, d, dl)	\
-	snappy_decompress_(s, sl, d, dl)
-#else
-#error either CONFIG_ZRAM_LZO or CONFIG_ZRAM_SNAPPY must be defined
-#endif
+#ifdef MULTIPLE_COMPRESSORS
+static const struct zram_compressor snappy_compressor = {
+.name = "SNAPPY",
+.workmem_bytes = (1 << WMSIZE_ORDER),
+.compress = &snappy_compress_,
+.decompress = &snappy_decompress_
+};
+#else /* !MULTIPLE_COMPRESSORS */
+#define WMSIZE (1 << WMSIZE_ORDER)
+#define COMPRESS(s, sl, d, dl, wm) \
+snappy_compress_(s, sl, d, dl, wm)
+#define DECOMPRESS(s, sl, d, dl) \
+snappy_decompress_(s, sl, d, dl)
+#endif /* !MULTIPLE_COMPRESSORS */
+#endif /* defined(CONFIG_ZRAM_SNAPPY) */
 
+#ifdef MULTIPLE_COMPRESSORS
+const struct zram_compressor * const zram_compressors[] = {
+#if defined(CONFIG_ZRAM_LZO)
+&lzo_compressor,
+#endif
+#if defined(CONFIG_ZRAM_SNAPPY)
+&snappy_compressor,
+#endif
+NULL
+};
+#define WMSIZE (zram->compressor->workmem_bytes)
+#define COMPRESS(s, sl, d, dl, wm) \
+(zram->compressor->compress(s, sl, d, dl, wm))
+#define DECOMPRESS(s, sl, d, dl) \
+(zram->compressor->decompress(s, sl, d, dl))
+#endif /* MULTIPLE_COMPRESSORS */
 
 /* Globals */
 static int zram_major;
@@ -388,8 +422,8 @@ static int zram_write(struct zram *zram, struct bio *bio)
 			continue;
 		}
 
-		ret = COMPRESS(user_mem, PAGE_SIZE, src, &clen,
-					zram->compress_workmem);
+		COMPRESS(user_mem, PAGE_SIZE, src, &clen,
+			zram->compress_workmem);
 
 		kunmap_atomic(user_mem, KM_USER0);
 
@@ -683,6 +717,11 @@ static int create_device(struct zram *zram, int device_id)
 
 	/* Actual capacity set using syfs (/sys/block/zram<id>/disksize */
 	set_capacity(zram->disk, 0);
+
+	/* Can be changed using sysfs (/sys/block/zram<id>/compressor) */
+	#ifdef MULTIPLE_COMPRESSORS
+		zram->compressor = zram_compressors[0];
+	#endif
 
 	/*
 	 * To ensure that we always get PAGE_SIZE aligned
