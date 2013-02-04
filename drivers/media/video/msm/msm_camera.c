@@ -3052,7 +3052,7 @@ static int msm_open_frame(struct inode *inode, struct file *filep)
 
 static int msm_open(struct inode *inode, struct file *filep)
 {
-	return msm_open_common(inode, filep, 1, 0);
+	return msm_open_common(inode, filep, 0, 0);
 }
 
 static int msm_open_control(struct inode *inode, struct file *filep)
