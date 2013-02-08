@@ -334,11 +334,11 @@ CHECK		= sparse
 LGE_CF		= -D__CHECK_ENDIAN__ -Wcast-truncate -Wno-paren-string -Wtypesign
 CHECKFLAGS     := -D__linux__ -Dlinux -D__STDC__ -Dunix -D__unix__ \
 		  -Wbitwise -Wno-return-void $(CF) $(LGE_CF)
-MODFLAGS	= -DMODULE -mfpu=vfp
+MODFLAGS	= -DMODULE -O2 -mfpu=vfp
 CFLAGS_MODULE   = $(MODFLAGS)
 AFLAGS_MODULE   = $(MODFLAGS)
 LDFLAGS_MODULE  = -T $(srctree)/scripts/module-common.lds
-CFLAGS_KERNEL	= -ffast-math -mfpu=vfp -pipe
+CFLAGS_KERNEL	= -O2 -ffast-math -mfpu=vfp -pipe
 AFLAGS_KERNEL	= -ffast-math -mfpu=vfp -pipe
 CFLAGS_GCOV	= -fprofile-arcs -ftest-coverage
 
@@ -533,8 +533,12 @@ all: vmlinux
 
 ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
 KBUILD_CFLAGS	+= -Os
-else
+endif
+ifdef CONFIG_CC_OPTIMIZE_DEFAULT
 KBUILD_CFLAGS	+= -O2
+endif
+ifdef CONFIG_CC_OPTIMIZE_ALOT
+KBUILD_CFLAGS	+= -O3
 endif
 
 include $(srctree)/arch/$(SRCARCH)/Makefile
