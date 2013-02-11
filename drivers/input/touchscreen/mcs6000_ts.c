@@ -145,38 +145,8 @@ enum {
 	MCS6000_DEV_DOWNLOAD
 };
 
-/* LGE_CHANGE_S [kyuhyung.lee@lge.com] 2010.02.23 : to support touch event from UTS*/
-/* [FIXME temporary code] copy form VS740 by younchan.kim 2010-06-11 */
-void Send_Touch( unsigned int x, unsigned int y)
-{
-	if (mcs6000_ext_ts == (void *)NULL) {
-		printk(KERN_ERR "mcs6000 not proved\n");
-		return;
-	}
-
 #ifdef LG_FW_MULTI_TOUCH
-	input_report_abs(mcs6000_ext_ts->input_dev, ABS_MT_TOUCH_MAJOR, 1);
-	input_report_abs(mcs6000_ext_ts->input_dev, ABS_MT_POSITION_X, x);
-	input_report_abs(mcs6000_ext_ts->input_dev, ABS_MT_POSITION_Y, y);
-	input_mt_sync(mcs6000_ext_ts->input_dev);
-	input_sync(mcs6000_ext_ts->input_dev);
-
-	input_report_abs(mcs6000_ext_ts->input_dev, ABS_MT_TOUCH_MAJOR, 0);
-	input_report_abs(mcs6000_ext_ts->input_dev, ABS_MT_POSITION_X, x);
-	input_report_abs(mcs6000_ext_ts->input_dev, ABS_MT_POSITION_Y, y);
-	input_mt_sync(mcs6000_ext_ts->input_dev);
-	input_sync(mcs6000_ext_ts->input_dev);
-#else
-	mcs6000_ts_event_touch( x, y , mcs6000_ext_ts) ;
-	input_report_abs(mcs6000_ext_ts->input_dev, ABS_X, x);
-	input_report_abs(mcs6000_ext_ts->input_dev, ABS_Y, y);
-	input_sync(mcs6000_ext_ts->input_dev);
-#endif
-}
-EXPORT_SYMBOL(Send_Touch);
-
-#ifdef LG_FW_MULTI_TOUCH
-static __inline void mcs6000_multi_ts_event_touch(int x1, int y1, int x2, int y2, int value,
+static __inline void mcs6000_multi_ts_event_touch(int x1, int y1, int z1, int x2, int y2, int z2, int value,
 		struct mcs6000_ts_data *ts)
 {
 	int report = 0;
@@ -184,16 +154,16 @@ static __inline void mcs6000_multi_ts_event_touch(int x1, int y1, int x2, int y2
 	if (MCS6000_DM_TRACE_FUNC & mcs6000_debug_mask)
 		DMSG("\n");
 
-	if ((x1 >= 0) && (y1 >= 0)) {
-		input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR, value);
+	if ((x1 >= 0) && (y1 >= 0) && (z1 >= 0)) {
+		input_report_abs(dev->input_dev, ABS_MT_TOUCH_MAJOR, value ? z1 : value);
 		input_report_abs(ts->input_dev, ABS_MT_POSITION_X, x1);
 		input_report_abs(ts->input_dev, ABS_MT_POSITION_Y, y1);
 		input_mt_sync(ts->input_dev);
 		report = 1;
 	}
 
-	if ((x2 >= 0) && (y2 >= 0)) {
-		input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR, value);
+	if ((x2 >= 0) && (y2 >= 0) && (z2 >= 0)) {
+		input_report_abs(dev->input_dev, ABS_MT_TOUCH_MAJOR, value ? z2 : value);
 		input_report_abs(ts->input_dev, ABS_MT_POSITION_X, x2);
 		input_report_abs(ts->input_dev, ABS_MT_POSITION_Y, y2);
 		input_mt_sync(ts->input_dev);
@@ -253,13 +223,18 @@ static __inline void mcs6000_single_ts_event_release(struct mcs6000_ts_data *ts)
 static void mcs6000_ts_work_func(struct work_struct *work)
 {
 	int x1 = 0, y1 = 0;
+	static int flipy=0;
+	static int flipx=0;
+	static int flipdx=1;
+	static int flipdy=1;
 #ifdef LG_FW_MULTI_TOUCH
-	int x2 = 0, y2 = 0;
-	static int pre_x1, pre_x2, pre_y1, pre_y2;
+	int x2=0, y2 = 0, z1 = 0, z2 = 0;
+	static int pre_x1, pre_x2, pre_y1, pre_y2, pre_z1, pre_z2;
 	static unsigned int s_input_type = NON_TOUCHED_STATE;
 #endif
 	unsigned int input_type;
 	unsigned char read_buf[READ_NUM];
+	// unsigned char z_buf[1]
 
 	static int touch_pressed = 0;
 
@@ -278,19 +253,38 @@ static void mcs6000_ts_work_func(struct work_struct *work)
 
 	input_type = read_buf[0] & 0x0f;
 
+	x1 = y1 = 0;
+#ifdef LG_FW_MULTI_TOUCH
+	x2 = y2 = z2 = z1 = 0;
+#endif
 	x1 = (read_buf[1] & 0xf0) << 4;
 	y1 = (read_buf[1] & 0x0f) << 8;
 
 	x1 |= read_buf[2];	
-	y1 |= read_buf[3];		
+	y1 |= read_buf[3];
+/*	
+	if ( i2c_smbus_read_i2c_block_data(dev->client, MCS6000_TS_Z, 1, z_buf) < 0) {
+		printk(KERN_ERR "%s touch ic read MCS6000_TS_Z error\n", __FUNCTION__);
+	}
+	z1 = z_buf[0];
+	printk("%d == %d\n",z1,read_buf[4]);
+*/		
 
 #ifdef LG_FW_MULTI_TOUCH
+		z1 = read_buf[4]
 	if (input_type == MULTI_POINT_TOUCH) {
 		s_input_type = input_type;
 		x2 = (read_buf[5] & 0xf0) << 4;
 		y2 = (read_buf[5] & 0x0f) << 8;
 		x2 |= read_buf[6];
 		y2 |= read_buf[7];
+/*		
+	    if ( i2c_smbus_read_i2c_block_data(dev->client, MCS6000_TS_Z2, 1, z_buf) < 0) {
+    		printk(KERN_ERR "%s touch ic read MCS6000_TS_Z2 error\n", __FUNCTION__);
+    	}
+    	z2 = z_buf[0];
+*/
+        z2=z1;
 	}
 #endif
 	if (input_type) {
@@ -298,13 +292,39 @@ static void mcs6000_ts_work_func(struct work_struct *work)
 
 #ifdef LG_FW_MULTI_TOUCH
 		if (input_type == MULTI_POINT_TOUCH) {
-			mcs6000_multi_ts_event_touch(x1, y1, x2, y2, PRESSED, ts);
+                	//flipping x and y of points (the axis inverse workaround)
+                        if(abs(y1-y2) <= 35 && flipdx ){
+			 y1=y2; //trying to make the process smoother
+			 flipx=!flipx;
+			 flipdx=0;
+			}
+			if(abs(x1-x2) <= 35 && flipdy ){
+                               
+			 x1=x2; //trying to make the process smoother 
+			 flipy=!flipy;
+			 flipdy=0;
+			}
+
+			if(flipx)
+			 swap(x1,x2); 
+
+			if(flipy)
+			 swap(y1,y2);
+
+			if(abs(y1-y2) > 35)
+			 flipdx=1; 
+
+			if(abs(x1-x2) > 35)
+			 flipdy=1; 
+			mcs6000_multi_ts_event_touch(x1, y1, z1, x2, y2, z2, PRESSED, dev);
 			pre_x1 = x1;
 			pre_y1 = y1;
+			pre_z1 = z1;
 			pre_x2 = x2;
 			pre_y2 = y2;
+			pre_z2 = z2;
 		} else if (input_type == SINGLE_POINT_TOUCH) {
-			mcs6000_multi_ts_event_touch(x1, y1, -1, -1, PRESSED, ts);
+			mcs6000_multi_ts_event_touch(x1, y1, z1, -1, -1, -1, PRESSED, dev);
 			s_input_type = SINGLE_POINT_TOUCH;				
 		}
 #else
@@ -319,15 +339,15 @@ static void mcs6000_ts_work_func(struct work_struct *work)
 			if (s_input_type == MULTI_POINT_TOUCH) {
 				if (MCS6000_DM_TRACE_YES & mcs6000_debug_mask)
 					DMSG("multi touch release...(%d, %d), (%d, %d)\n", pre_x1,pre_y1,pre_x2,pre_y2);
-				mcs6000_multi_ts_event_touch(pre_x1, pre_y1, pre_x2, pre_y2, RELEASED, ts);
+				mcs6000_multi_ts_event_touch(pre_x1, pre_y1, pre_z1, pre_x2, pre_y2, pre_z2, RELEASED, dev);
 				s_input_type = NON_TOUCHED_STATE; 
-				pre_x1 = -1; pre_y1 = -1; pre_x2 = -1; pre_y2 = -1;
+				pre_x1 = -1; pre_y1 = -1; pre_z1 = -1; pre_x2 = -1; pre_y2 = -1; pre_z2 = -1;
 			} 
 			else {
 				if (MCS6000_DM_TRACE_YES & mcs6000_debug_mask)
 					DMSG("single touch release... %d, %d\n", x1, y1);
 
-				mcs6000_multi_ts_event_touch(x1, y1, -1, -1, RELEASED, ts);
+				mcs6000_multi_ts_event_touch(x1, y1, z1, -1, -1, -1, RELEASED, dev);
 			}
 #else
 			if (MCS6000_DM_TRACE_YES & mcs6000_debug_mask)
@@ -1046,6 +1066,7 @@ static int mcs6000_ts_probe(struct i2c_client *client, const struct i2c_device_i
 #ifdef LG_FW_MULTI_TOUCH
 	input_set_abs_params(ts->input_dev, ABS_MT_POSITION_X, pdata->ts_x_min, pdata->ts_x_max, 0, 0);
 	input_set_abs_params(ts->input_dev, ABS_MT_POSITION_Y, pdata->ts_y_min, pdata->ts_y_max, 0, 0);
+	input_set_abs_params(mcs6000_ts_input, ABS_MT_TOUCH_MAJOR, 0, 255, 0, 0);
 #else	
 	input_set_abs_params(ts->input_dev, ABS_X, pdata->ts_x_min, pdata->ts_x_max, 0, 0);
 	input_set_abs_params(ts->input_dev, ABS_Y, pdata->ts_y_min, pdata->ts_y_max, 0, 0);
