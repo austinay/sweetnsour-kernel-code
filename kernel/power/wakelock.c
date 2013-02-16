@@ -422,6 +422,7 @@ static void suspend(struct work_struct *work)
 		pr_info("suspend: enter suspend\n");
 	getnstimeofday(&ts_entry);
 	ret = pm_suspend(requested_suspend_state);
+	getnstimeofday(&ts_exit);
 	if (debug_mask & DEBUG_EXIT_SUSPEND) {
 		struct rtc_time tm;
 		rtc_time_to_tm(ts_exit.tv_sec, &tm);
