@@ -68,6 +68,8 @@ extern unsigned long ebi1_phys_offset;
 
 #endif
 
+#define CONSISTENT_DMA_SIZE (SZ_1M * 14)
+
 #ifndef __ASSEMBLY__
 void *alloc_bootmem_aligned(unsigned long size, unsigned long alignment);
 void *allocate_contiguous_ebi(unsigned long, unsigned long, int);
