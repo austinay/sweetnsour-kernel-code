@@ -204,6 +204,9 @@ void kthread_bind(struct task_struct *p, unsigned int cpu)
 
 	/* It's safe because the task is inactive. */
 	do_set_cpus_allowed(p, cpumask_of(cpu));
+#ifndef CONFIG_SCHED_BFS
+	p->rt.nr_cpus_allowed = 1;
+#endif
 	p->flags |= PF_THREAD_BOUND;
 }
 EXPORT_SYMBOL(kthread_bind);
