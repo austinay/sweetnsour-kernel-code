@@ -830,6 +830,20 @@ config TOUCHSCREEN_MCS6000
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called tsc2007.
+
+config TOUCHSCREEN_OPTIMIZED_MCS6000
+	default n
+	tristate "Optimized MCS6000 touchscreens"
+	depends on I2C
+	help
+	  Say Y here if you have a MCS6000 touchscreen.
+	  This is MCS6000 touchscreen with optimizations
+	  and patches.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called tsc2007.
 	  
 config TOUCHSCREEN_SYNAPTICS_I2C_RMI
 	default n
