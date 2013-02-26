@@ -572,7 +572,7 @@ static int mcs6000_ioctl_release(struct inode *inode, struct file *flip)
 static struct file_operations mcs6000_ts_ioctl_fops =
 {
   .owner = THIS_MODULE,
-  .ioctl = mcs6000_ts_ioctl,
+  .unlocked_ioctl = mcs6000_ts_ioctl,
   .open  = mcs6000_ioctl_open,
   .release = mcs6000_ioctl_release,
 };
