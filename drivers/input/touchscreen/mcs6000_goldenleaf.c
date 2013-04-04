@@ -485,6 +485,7 @@ static __inline int mcs6000_ts_ioctl_down_i2c_read(unsigned char addr,
 int mcs6000_ts_ioctl_down(struct inode *inode, struct file *flip, unsigned int cmd, unsigned long arg)
 {
 	int err = 0;
+#if 0
 	struct mcs6000_ts_down_ioctl_i2c_type client_data;
 	struct mcs6000_ts_device *dev = NULL;
 
@@ -583,7 +584,7 @@ int mcs6000_ts_ioctl_down(struct inode *inode, struct file *flip, unsigned int c
 
 	if (err < 0)
 		printk(KERN_ERR "\n==== Touch DONW IOCTL Fail....%d\n",_IOC_NR(cmd));
-
+#endif
 	return err;
 }
 
