@@ -856,19 +856,6 @@ config TOUCHSCREEN_MCS6000_LGP500
 
           To compile this driver as a module, choose M here: the
           module will be called tsc2007.
-
-config TOUCHSCREEN_GOLDENLEAF
-	default n
-	tristate "MCS6000 Goldenleaf TS driver from fserve"
-	depends on I2C
-	help
-	  Say Y here if you have a MCS6000 touchscreen.
-	  This is the touchscreen driver from fserve's Goldenleaf kernel.
-
-	  If unsure, say N.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called tsc2007.
 	  
 config TOUCHSCREEN_SYNAPTICS_I2C_RMI
 	default n
