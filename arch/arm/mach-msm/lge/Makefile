@@ -104,3 +104,4 @@ obj-$(CONFIG_LGE_FACTORY) += userDataBackUpDiag.o
 obj-$(CONFIG_LGE_FACTORY) += lge_diag_eri.o
 obj-$(CONFIG_LGE_FACTORY) += lg_diag_dload.o
 obj-$(CONFIG_LGE_ERROR_HANDLER) += lge_test.o
+obj-$(CONFIG_FORCE_FAST_CHARGE) += fastchg.o
